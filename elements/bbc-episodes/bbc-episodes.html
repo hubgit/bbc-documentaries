@@ -1,0 +1,107 @@
+<link rel="import" href="../../bower_components/polymer/polymer.html">
+
+<polymer-element name="bbc-episodes" attributes="format heading description">
+  <template>
+    <link rel="stylesheet" href="bbc-episodes.css">
+
+    <header>
+      <h1>{{ heading }}</h1>
+      <p>{{ description }}</p>
+    </header>
+
+    <template if="{{ !items.length }}">
+      <div id="status">{{ status }}</div>
+    </template>
+
+    <template repeat="{{ items }}">
+      <a href="https://bbc.co.uk/programmes/{{ pid }}" class="episode" target="_blank" layout horizontal>
+        <div class="image">
+          <img src="http://ichef.bbci.co.uk/images/ic/150x84/{{ image.pid }}.jpg">
+        </div>
+        <div flex>
+          <div class="title">
+            <template if="{{ brandTitle }}">
+              <span class="brand">{{ brandTitle }}</span>
+            </template>
+            <span class="title">{{ title }}</span>
+          </div>
+          <div class="synopsis">{{ short_synopsis }}</div>
+          <div class="first-broadcast date">{{ date }}</div>
+          <template if="{{ programme.expected_child_count }}">
+            <div class="position">
+              <template if="{{ programme.position }}">
+                <span class="series-position">Series {{ programme.position }}</span>
+               </template>
+              <span class="episode-position">Episode {{ position }} of {{ programme.expected_child_count }}</span>
+            </div>
+          </template>
+        </div>
+      </a>
+    </template>
+  </template>
+  <script>
+    (function () {
+      Polymer({
+        format: '',
+        heading: '',
+        description: '',
+        limit: 50,
+        status: 'Loading…',
+        ready: function() {
+          this.items = [];
+        },
+        formatChanged: function() {
+          var url = 'http://www.bbc.co.uk/tv/programmes/formats/' + this.format + '/player/episodes.json';
+
+          var params = {
+            limit: this.limit,
+            page: 1
+          };
+
+          var items = this.items;
+
+          Collection(url, params).get('json', {
+            items: function(data) {
+              return data.episodes.map(function(episode) {
+                var programme = episode.programme;
+
+                programme.date = programme.first_broadcast_date.replace(/T.+/, '');
+
+                if (programme.programme) {
+                  if (programme.programme.programme) {
+                    programme.brandTitle = programme.programme.programme.title;
+                  } else {
+                    programme.brandTitle = programme.programme.title;
+                  }
+                }
+
+                return programme;
+              });
+            },
+            next: function(data) {
+              params.page++;
+
+              if ((params.page - 1) * params.limit > data.total) {
+                return false;
+              }
+
+              this.status = 'Loading page ' + params.page + ' of ' + Math.ceil(data.total / params.limit) + '…';
+              this.elementHeight = this.elementHeight; // redraw
+
+              return [url, params];
+            }.bind(this)
+          }).then(function(data) {
+            data.sort(function(a, b) {
+              return a.first_broadcast_date > b.first_broadcast_date ? -1 : 1;
+            });
+
+            // need to copy the items
+            data.slice(0, 100).forEach(function(item) {
+              items.push(item);
+            });
+          });
+        }
+      });
+    })();
+  </script>
+</polymer-element>
